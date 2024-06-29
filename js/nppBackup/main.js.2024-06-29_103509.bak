@@ -1,0 +1,95 @@
+'use strict';
+
+var main = main || {};
+
+let insertionIndicator;
+
+document.addEventListener('DOMContentLoaded', evt => {
+  evt.target.getElementById('toggleButton').firstChild.src = assets['images']['off'];
+  evt.target.getElementById('captureButton').firstChild.src = assets['images']['capture'];
+  evt.target.getElementById('undoButton').firstChild.src = assets['images']['undo'];
+  evt.target.getElementById('playButton').firstChild.src = assets['images']['playpause'];
+  evt.target.getElementById('clearButton').firstChild.src = assets['images']['clear'];
+  evt.target.getElementById('saveButton').firstChild.src = assets['images']['save'];
+  evt.target.getElementById('loadButton').firstChild.src = assets['images']['load'];
+});
+
+window.addEventListener('load', evt => {
+  // Create Animator object and set up callbacks.
+  let video = document.getElementById('video');
+  let snapshotCanvas = document.getElementById('snapshot-canvas');
+  let playCanvas = document.getElementById('play-canvas');
+  let videoMessage = document.getElementById('video-message');
+  let an = new animator.Animator(video, snapshotCanvas, playCanvas, videoMessage);
+
+  main.animator = an;
+
+  createInsertionIndicator();
+  thumbnailContainer.addEventListener('dragover', handleDragOver);
+  thumbnailContainer.addEventListener('drop', handleDrop);
+
+  let playbackSpeedSelector = document.getElementById('playbackSpeed');
+  let playbackSpeed = (() => {
+    return Number(playbackSpeedSelector.value);
+  });
+  let fps = document.getElementById('fps');
+  playbackSpeedSelector.addEventListener("input", evt => {
+    an.setPlaybackSpeed(playbackSpeed());
+    fps.innerText = '  ' + playbackSpeed().toFixed(1);
+  });
+  an.setPlaybackSpeed(playbackSpeed());
+
+  let captureClicks = (e => { e.stopPropagation() });
+  let showSpinner = (() => {
+    let topContainer = document.getElementById('top-container');
+    topContainer.style.opacity = 0.5;
+    topContainer.addEventListener('click', captureClicks, true);
+  });
+  let hideSpinner = (() => {
+    let topContainer = document.getElementById('top-container');
+    topContainer.style.opacity = null;
+    topContainer.removeEventListener('click', captureClicks, true);
+  });
+
+  let saveDialog = document.getElementById('saveDialog');
+  let fileNameInput = saveDialog.querySelector('input');
+  let saveCB = () => {
+    let value = fileNameInput.value;
+    if (!value.length)
+      value = 'StopMotion';
+    value = value.replace(/\s+/g, '_');
+    value = value.replace(/[^\w\-\.]+/g, '');
+    if (value.endsWith('.mng'))
+      value = value.substring(0, value.length - 4);
+    if (!value.endsWith('.webm'))
+      value += '.webm';
+    saveDialog.close();
+    let topContainer = document.getElementById('top-container');
+    topContainer.style.opacity = 0.5;
+    topContainer.addEventListener('click', captureClicks, true);
+    an.save(value).then(() => {
+      topContainer.style.opacity = null;
+      topContainer.removeEventListener('click', captureClicks, true);
+    }).catch(err => {
+      console.log(err);
+      topContainer.style.opacity = null;
+      topContainer.removeEventListener('click', captureClicks, true);
+    });
+  };
+
+  let captureButton = document.getElementById('captureButton');
+  let undoButton = document.getElementById('undoButton');
+  let clearConfirmDialog = document.getElementById('clearConfirmDialog');
+  window.addEventListener("keydown", (e => {
+    if (e.altKey || e.ctrlKey || e.shiftKey || clearConfirmDialog.open || saveDialog.open)
+      return;
+    if (e.code == "Space") {
+      e.preventDefault();
+      captureButton.click();
+    }
+    if (e.code == "Backspace") {
+      e.preventDefault();
+      undoButton.click();
+    }
+  }));
+  
