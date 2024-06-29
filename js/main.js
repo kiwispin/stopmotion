@@ -2,6 +2,8 @@
 
 var main = main || {};
 
+let selectedFrameIndex = -1;
+
 document.addEventListener('DOMContentLoaded', evt => {
   evt.target.getElementById('toggleButton').firstChild.src = assets['images']['off'];
   evt.target.getElementById('captureButton').firstChild.src = assets['images']['capture'];
@@ -44,7 +46,6 @@ window.addEventListener('load', evt => {
     topContainer.style.opacity = null;
     topContainer.removeEventListener('click', captureClicks, true);
   });
-
   let saveDialog = document.getElementById('saveDialog');
   let fileNameInput = saveDialog.querySelector('input');
   let saveCB = () => {
@@ -108,35 +109,40 @@ window.addEventListener('load', evt => {
   let thumbnailContainer = document.getElementById('thumbnail-container');
   let thumbnailWidth = 96;
   let thumbnailHeight = 72;
-  let selectedFrameIndex = -1;
 
-function selectThumbnail(evt) {
-  console.log('selectThumbnail called', evt.target);
-  thumbnailContainer.querySelectorAll('canvas').forEach(thumb => {
-    thumb.classList.remove('selected');
-  });
-  evt.target.classList.add('selected');
-  console.log('Selected class added', evt.target.classList.contains('selected'));
-  selectedFrameIndex = parseInt(evt.target.dataset.frameIndex);
-}
+  function selectThumbnail(evt) {
+    thumbnailContainer.querySelectorAll('canvas').forEach(thumb => {
+      thumb.classList.remove('selected');
+    });
+    evt.target.classList.add('selected');
+    selectedFrameIndex = parseInt(evt.target.dataset.frameIndex);
+  }
 
-captureButton.addEventListener("click", evt => {
-  an.capture();
-  let thumbnail = document.createElement('canvas');
-  thumbnail.width = thumbnailWidth;
-  thumbnail.height = thumbnailHeight;
-  thumbnail.getContext('2d', { alpha: false }).drawImage(
-    an.frames[an.frames.length-1], 0, 0, thumbnailWidth, thumbnailHeight);
-  thumbnail.dataset.frameIndex = an.frames.length - 1;
-    console.log('Thumbnail created and appended', thumbnail, 'Dimensions:', thumbnail.width, 'x', thumbnail.height, 'Visible:', thumbnail.offsetParent !== null);
-  thumbnail.addEventListener('click', function(e) {
-    console.log('Thumbnail clicked', e.target);
-    selectThumbnail(e);
+  captureButton.addEventListener("click", evt => {
+    let insertIndex = selectedFrameIndex === -1 ? an.frames.length : selectedFrameIndex + 1;
+    an.captureAt(insertIndex);
+    let thumbnail = document.createElement('canvas');
+    thumbnail.width = thumbnailWidth;
+    thumbnail.height = thumbnailHeight;
+    thumbnail.getContext('2d', { alpha: false }).drawImage(
+      an.frames[insertIndex], 0, 0, thumbnailWidth, thumbnailHeight);
+    thumbnail.dataset.frameIndex = insertIndex;
+    thumbnail.addEventListener('click', selectThumbnail);
+    
+    if (insertIndex < thumbnailContainer.children.length) {
+      thumbnailContainer.insertBefore(thumbnail, thumbnailContainer.children[insertIndex]);
+    } else {
+      thumbnailContainer.appendChild(thumbnail);
+    }
+    
+    // Update frame indices for all thumbnails after the insertion point
+    for (let i = insertIndex + 1; i < thumbnailContainer.children.length; i++) {
+      thumbnailContainer.children[i].dataset.frameIndex = i;
+    }
+    
+    selectedFrameIndex = insertIndex;
+    pressButton(captureButton);
   });
-  thumbnailContainer.appendChild(thumbnail);
-  console.log('Thumbnail created and appended', thumbnail);
-  pressButton(captureButton);
-});
 
   undoButton.addEventListener("click", evt => {
     an.undoCapture();
@@ -333,31 +339,28 @@ captureButton.addEventListener("click", evt => {
     }
   });
 
-  let clearAudioButton = document.getElementById('clearAudioButton');
-  clearAudioButton.addEventListener("click", an.clearAudio.bind(an));
-
   let deleteFrameButton = document.getElementById('deleteFrameButton');
-deleteFrameButton.addEventListener("click", evt => {
-  if (selectedFrameIndex === -1) {
-    alert("Please select a frame to delete.");
-    return;
-  }
-  
-  an.deleteFrame(selectedFrameIndex);
-  
-  // Remove the thumbnail
-  let thumbnailToRemove = thumbnailContainer.children[selectedFrameIndex];
-  thumbnailContainer.removeChild(thumbnailToRemove);
-  
-  // Update remaining thumbnails' frame indices
-  for (let i = selectedFrameIndex; i < thumbnailContainer.children.length; i++) {
-    thumbnailContainer.children[i].dataset.frameIndex = i;
-  }
-  
-  selectedFrameIndex = -1;
-  
-  pressButton(deleteFrameButton);
-});
+  deleteFrameButton.addEventListener("click", evt => {
+    if (selectedFrameIndex === -1) {
+      alert("Please select a frame to delete.");
+      return;
+    }
+    
+    an.deleteFrame(selectedFrameIndex);
+    
+    // Remove the thumbnail
+    let thumbnailToRemove = thumbnailContainer.children[selectedFrameIndex];
+    thumbnailContainer.removeChild(thumbnailToRemove);
+    
+    // Update remaining thumbnails' frame indices
+    for (let i = selectedFrameIndex; i < thumbnailContainer.children.length; i++) {
+      thumbnailContainer.children[i].dataset.frameIndex = i;
+    }
+    
+    selectedFrameIndex = -1;
+    
+    pressButton(deleteFrameButton);
+  });
 
   let setUpCameraSelectAndAttach = cameras => {
     if (!cameras || cameras.length < 2) {
@@ -401,4 +404,11 @@ deleteFrameButton.addEventListener("click", evt => {
   } else {
     setUpCameraSelectAndAttach();
   }
+
+  // Add event listener for thumbnail container to handle frame selection
+  thumbnailContainer.addEventListener('click', evt => {
+    if (evt.target.tagName === 'CANVAS') {
+      selectThumbnail(evt);
+    }
+  });
 });

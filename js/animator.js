@@ -32,6 +32,7 @@ var animator = animator || {};
       this.setDimensions(snapshotCanvas.width, snapshotCanvas.height);
       this.zeroPlayTime = 0;
 	  
+      
 	  
     }
 
@@ -148,6 +149,32 @@ var animator = animator || {};
       this.frameWebps.push(promise);
     }
 
+    captureAt(index) {
+      if (!this.streamOn) return;
+      let imageCanvas = document.createElement('canvas');
+      imageCanvas.width = this.w;
+      imageCanvas.height = this.h;
+      let context = imageCanvas.getContext('2d', { alpha: false });
+      if (this._flip) {
+        context.rotate(Math.PI);
+        context.translate(-this.w, -this.h);
+      }
+      context.drawImage(this.video, 0, 0, this.w, this.h);
+      this.frames.splice(index, 0, imageCanvas);
+      let promise = new Promise((resolve, reject) => {
+        if (self.requestIdleCallback) {
+          requestIdleCallback(() => {
+            imageCanvas.toBlob(blob => { resolve(blob); }, 'image/webp');
+          });
+        } else {
+          imageCanvas.toBlob(blob => { resolve(blob); }, 'image/webp');
+        }
+        this.snapshotContext.clearRect(0, 0, this.w, this.h);
+        this.snapshotContext.drawImage(imageCanvas, 0, 0, this.w, this.h);
+      });
+      this.frameWebps.splice(index, 0, promise);
+    }
+    
     undoCapture() {
       this.frames.pop();
       this.frameWebps.pop();
