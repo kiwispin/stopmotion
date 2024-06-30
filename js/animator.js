@@ -174,6 +174,26 @@ var animator = animator || {};
       });
       this.frameWebps.splice(index, 0, promise);
     }
+
+    duplicateFrame(sourceIndex, targetIndex) {
+      if (sourceIndex < 0 || sourceIndex >= this.frames.length) return;
+      
+      let sourceCanvas = this.frames[sourceIndex];
+      let duplicateCanvas = document.createElement('canvas');
+      duplicateCanvas.width = this.w;
+      duplicateCanvas.height = this.h;
+      duplicateCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
+      
+      this.frames.splice(targetIndex, 0, duplicateCanvas);
+      
+      let duplicatePromise = new Promise((resolve, reject) => {
+        duplicateCanvas.toBlob(blob => { resolve(blob); }, 'image/webp');
+      });
+      this.frameWebps.splice(targetIndex, 0, duplicatePromise);
+      
+      this.snapshotContext.clearRect(0, 0, this.w, this.h);
+      this.snapshotContext.drawImage(duplicateCanvas, 0, 0, this.w, this.h);
+    }
     
     undoCapture() {
       this.frames.pop();
